@@ -150,13 +150,17 @@ jobs:
             exit 0
           fi
           
-          # Find the most recently committed .zip file using git history
-          # (filesystem mtime is unreliable after checkout)
-          LATEST_ZIP=$(git log --all --pretty=format: --name-only --diff-filter=d \
-            | grep -E "^${{ env.GAME_ZIP_PATH }}/.*\.zip$" \
-            | head -1)
+          # Find the most recently committed .zip file that still exists on disk
+          # (iterates through git history and picks first match that exists)
+          LATEST_ZIP=""
+          while IFS= read -r candidate; do
+            if [[ -n "$candidate" && -f "$candidate" ]]; then
+              LATEST_ZIP="$candidate"
+              break
+            fi
+          done < <(git log --all --pretty=format: --name-only | grep -E "^${{ env.GAME_ZIP_PATH }}/.*\.zip$" | awk '!seen[$0]++')
           
-          if [[ -n "$LATEST_ZIP" && -f "$LATEST_ZIP" ]]; then
+          if [[ -n "$LATEST_ZIP" ]]; then
             echo "zip_file=$LATEST_ZIP" >> $GITHUB_OUTPUT
             echo "has_zip=true" >> $GITHUB_OUTPUT
             echo "✅ Found game archive: $LATEST_ZIP"
