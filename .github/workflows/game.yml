@@ -231,6 +231,9 @@ jobs:
       # image: barichello/godot-ci@sha256:<digest>
       # Find digests at: https://hub.docker.com/r/barichello/godot-ci/tags
       image: barichello/godot-ci:${{ needs.detect-changes.outputs.godot_version }}
+    defaults:
+      run:
+        shell: bash
     outputs:
       build_success: ${{ steps.verify-build.outputs.success }}
     steps:
