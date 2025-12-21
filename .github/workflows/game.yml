@@ -39,12 +39,6 @@ env:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 on:
-  push:
-    paths:
-      - 'docs/**/*.md'
-      - 'game/**/*.zip'
-      - '.github/workflows/deploy-game.yml'
-      - '.github/templates/**'
   workflow_dispatch:
     inputs:
       force_rebuild:
