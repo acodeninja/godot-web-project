@@ -2,33 +2,32 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # Deploys your Godot game alongside documentation to GitHub Pages.
 #
+# Configuration: Create a config.yml in your repo root with:
+#   game_name: "My Game"
+#   godot_version: "4.3"
+#   theme: "primer"
+#
 # Compatibility: Godot 4.x, GitHub Free tier
 # ═══════════════════════════════════════════════════════════════════════════════
 
 name: 🎮 Deploy Game & Docs 📚
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🎛️ CONFIGURATION - All variables hoisted here for easy customisation
+# 🎛️ CONFIGURATION - Defaults (overridden by config.yml if present)
 # ═══════════════════════════════════════════════════════════════════════════════
 env:
-  # ── Theme & Appearance ──────────────────────────────────────────────────────
-  # Options: primer, slate, midnight, minimal, hacker, architect, cayman,
-  #          dinky, modernist, leap-day, time-machine, merlot, tactile
-  JEKYLL_THEME: ${{ inputs.jekyll_theme || 'primer' }}
-  GAME_TITLE: ${{ inputs.game_title || 'Play Game' }}
-  
-  # ── Godot Configuration ─────────────────────────────────────────────────────
-  # Check available versions: https://hub.docker.com/r/barichello/godot-ci/tags
-  # Must match a tag from barichello/godot-ci (e.g., 4.3, 4.2.2, 4.1)
-  GODOT_VERSION: ${{ inputs.godot_version_override || inputs.godot_version || '4.2.2' }}
-  EXPORT_NAME: 'game'
-  EXPORT_PRESET_NAME: 'Web'
+  # ── Fallback Defaults (used if config.yml missing) ──────────────────────────
+  DEFAULT_THEME: 'primer'
+  DEFAULT_GAME_NAME: 'Play Game'
+  DEFAULT_GODOT_VERSION: '4.3'
   
   # ── Directory Paths ─────────────────────────────────────────────────────────
   GAME_ZIP_PATH: 'game'
   DOCS_PATH: 'docs'
   BUILD_DIR: '/tmp/game-project'
   SITE_OUTPUT_DIR: '_combined_site'
+  EXPORT_NAME: 'game'
+  EXPORT_PRESET_NAME: 'Web'
   
   # ── Build Settings ──────────────────────────────────────────────────────────
   ARTIFACT_RETENTION_DAYS: '1'
@@ -39,6 +38,11 @@ env:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'game/**'
+      - 'config.yml'
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -46,25 +50,6 @@ on:
         required: false
         default: false
         type: boolean
-      godot_version_override:
-        description: '🎮 Override Godot version (leave empty for default)'
-        required: false
-        default: ''
-        type: string
-  workflow_call:
-    inputs:
-      godot_version:
-        description: 'Godot Engine version'
-        type: string
-        default: '4.3'
-      jekyll_theme:
-        description: 'Jekyll theme name'
-        type: string
-        default: 'hacker'
-      game_title:
-        description: 'Game title for the play page'
-        type: string
-        default: 'Play Game'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔒 PERMISSIONS - Minimal permissions at workflow level
@@ -73,20 +58,78 @@ permissions:
   contents: read
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🔄 CONCURRENCY - Prevent overlapping deployments
+# 🔄 CONCURRENCY - Cancel in-progress deployments when new push arrives
 # ═══════════════════════════════════════════════════════════════════════════════
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   # ═══════════════════════════════════════════════════════════════════════════
-  # 🔍 JOB 1: Detect Changes
+  # 📖 JOB 1: Read Configuration
+  # ═══════════════════════════════════════════════════════════════════════════
+  read-config:
+    name: 📖 Read Configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      game_name: ${{ steps.config.outputs.game_name }}
+      godot_version: ${{ steps.config.outputs.godot_version }}
+      theme: ${{ steps.config.outputs.theme }}
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: config.yml
+          sparse-checkout-cone-mode: false
+
+      - name: 📖 Parse config.yml
+        id: config
+        run: |
+          CONFIG_FILE="config.yml"
+          
+          if [[ -f "$CONFIG_FILE" ]]; then
+            echo "✅ Found config.yml, parsing..."
+            
+            # Parse YAML values (handles quoted and unquoted values)
+            GAME_NAME=$(grep -E '^game_name:' "$CONFIG_FILE" | sed 's/^game_name:\s*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | xargs)
+            GODOT_VERSION=$(grep -E '^godot_version:' "$CONFIG_FILE" | sed 's/^godot_version:\s*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | xargs)
+            THEME=$(grep -E '^theme:' "$CONFIG_FILE" | sed 's/^theme:\s*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | xargs)
+            
+            echo "📋 Parsed values:"
+            echo "   game_name: ${GAME_NAME:-<not set>}"
+            echo "   godot_version: ${GODOT_VERSION:-<not set>}"
+            echo "   theme: ${THEME:-<not set>}"
+          else
+            echo "⚠️ No config.yml found, using defaults"
+          fi
+          
+          # Apply defaults for missing values
+          echo "game_name=${GAME_NAME:-${{ env.DEFAULT_GAME_NAME }}}" >> $GITHUB_OUTPUT
+          echo "godot_version=${GODOT_VERSION:-${{ env.DEFAULT_GODOT_VERSION }}}" >> $GITHUB_OUTPUT
+          echo "theme=${THEME:-${{ env.DEFAULT_THEME }}}" >> $GITHUB_OUTPUT
+
+      - name: 📊 Configuration Summary
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "         📖 CONFIGURATION SUMMARY          "
+          echo "═══════════════════════════════════════════"
+          echo "🎮 Game Name:      ${{ steps.config.outputs.game_name }}"
+          echo "🔧 Godot Version:  ${{ steps.config.outputs.godot_version }}"
+          echo "🎨 Theme:          ${{ steps.config.outputs.theme }}"
+          echo "═══════════════════════════════════════════"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 🔍 JOB 2: Detect Changes
   # ═══════════════════════════════════════════════════════════════════════════
   detect-changes:
     name: 🔍 Detect Changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: read-config
     permissions:
       contents: read
     outputs:
@@ -95,18 +138,11 @@ jobs:
       latest_game_zip: ${{ steps.find-game.outputs.zip_file }}
       has_game_zip: ${{ steps.find-game.outputs.has_zip }}
       should_build_all: ${{ steps.force-check.outputs.force_rebuild }}
-      godot_version: ${{ steps.godot-version.outputs.version }}
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0  # Full history needed for git log queries
-
-      - name: 🎮 Resolve Godot Version
-        id: godot-version
-        run: |
-          echo "version=${{ env.GODOT_VERSION }}" >> $GITHUB_OUTPUT
-          echo "🎮 Godot version: ${{ env.GODOT_VERSION }}"
 
       - name: 🔄 Check Force Rebuild Flag
         id: force-check
@@ -205,18 +241,18 @@ jobs:
           echo "📦 Game ZIP found:  ${{ steps.find-game.outputs.has_zip }}"
           echo "📁 ZIP file:        ${{ steps.find-game.outputs.zip_file }}"
           echo "🔄 Force rebuild:   ${{ steps.force-check.outputs.force_rebuild }}"
-          echo "🎮 Godot version:   ${{ steps.godot-version.outputs.version }}"
+          echo "🎮 Godot version:   ${{ needs.read-config.outputs.godot_version }}"
           echo "═══════════════════════════════════════════"
 
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # 🎮 JOB 2: Build Godot Game for Web
+  # 🎮 JOB 3: Build Godot Game for Web
   # ═══════════════════════════════════════════════════════════════════════════
   build-game:
     name: 🎮 Build Godot Game
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: detect-changes
+    needs: [read-config, detect-changes]
     if: needs.detect-changes.outputs.has_game_zip == 'true'
     permissions:
       contents: read
@@ -224,7 +260,7 @@ jobs:
       # Note: For maximum security, pin to a specific image digest:
       # image: barichello/godot-ci@sha256:<digest>
       # Find digests at: https://hub.docker.com/r/barichello/godot-ci/tags
-      image: barichello/godot-ci:${{ needs.detect-changes.outputs.godot_version }}
+      image: barichello/godot-ci:${{ needs.read-config.outputs.godot_version }}
     defaults:
       run:
         shell: bash
@@ -300,7 +336,7 @@ jobs:
 
       - name: 🔧 Setup Export Templates
         run: |
-          GODOT_VER="${{ needs.detect-changes.outputs.godot_version }}"
+          GODOT_VER="${{ needs.read-config.outputs.godot_version }}"
           echo "🔧 Setting up Godot export templates for version ${GODOT_VER}..."
           
           TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VER}.stable"
@@ -385,7 +421,7 @@ jobs:
           # Create output directory
           mkdir -p build/web
           
-          GODOT_VER="${{ needs.detect-changes.outputs.godot_version }}"
+          GODOT_VER="${{ needs.read-config.outputs.godot_version }}"
           echo "🏗️ Building game for web with Godot ${GODOT_VER}..."
           echo "═══════════════════════════════════════════"
           
@@ -482,13 +518,13 @@ jobs:
           if-no-files-found: error
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # 📚 JOB 3: Build Documentation Site
+  # 📚 JOB 4: Build Documentation Site
   # ═══════════════════════════════════════════════════════════════════════════
   build-docs:
     name: 📚 Build Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: detect-changes
+    needs: [read-config, detect-changes]
     permissions:
       contents: read
     steps:
@@ -535,20 +571,23 @@ jobs:
           ls -la _site_source/
 
       - name: 🎨 Configure Jekyll Theme
+        env:
+          THEME: ${{ needs.read-config.outputs.theme }}
+          GAME_NAME: ${{ needs.read-config.outputs.game_name }}
         run: |
-          echo "🎨 Applying theme: ${{ env.JEKYLL_THEME }}"
+          echo "🎨 Applying theme: $THEME"
           
           cat > _site_source/_config.yml << CONFIG_EOF
           # 🎮 Game Documentation Site
           # Auto-generated by deploy-game.yml workflow
-          # Theme: ${{ env.JEKYLL_THEME }}
+          # Theme: ${THEME}
 
-          remote_theme: pages-themes/${{ env.JEKYLL_THEME }}
+          remote_theme: pages-themes/${THEME}
 
           plugins:
             - jekyll-remote-theme
 
-          title: ${{ env.GAME_TITLE }} - Documentation
+          title: ${GAME_NAME} - Documentation
           description: Game documentation and playable demo
           baseurl: /${{ github.event.repository.name }}
 
@@ -606,13 +645,13 @@ jobs:
           if-no-files-found: error
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # 🔨 JOB 4: Combine Game and Documentation
+  # 🔨 JOB 5: Combine Game and Documentation
   # ═══════════════════════════════════════════════════════════════════════════
   combine-site:
     name: 🔨 Combine Game & Docs
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [detect-changes, build-game, build-docs]
+    needs: [read-config, detect-changes, build-game, build-docs]
     # Run if docs built successfully; game is optional
     # Note: This means the site deploys even if game build fails
     if: always() && needs.build-docs.result == 'success'
@@ -668,7 +707,7 @@ jobs:
 
       - name: 🎮 Create Game Embed Page
         env:
-          PAGE_TITLE: ${{ env.GAME_TITLE }}
+          PAGE_TITLE: ${{ needs.read-config.outputs.game_name }}
         run: |
           echo "🎮 Creating game embed page..."
           
@@ -1161,6 +1200,13 @@ jobs:
             fi
             
             echo ""
+            echo "### 📖 Configuration"
+            echo "| Setting | Value |"
+            echo "|---------|-------|"
+            echo "| Game Name | ${{ needs.read-config.outputs.game_name }} |"
+            echo "| Godot Version | ${{ needs.read-config.outputs.godot_version }} |"
+            echo "| Theme | ${{ needs.read-config.outputs.theme }} |"
+            echo ""
             echo "### 📂 Site Contents"
             echo "\`\`\`"
             find "${{ env.SITE_OUTPUT_DIR }}" -type f | head -30
@@ -1185,7 +1231,7 @@ jobs:
           path: ${{ env.SITE_OUTPUT_DIR }}/
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # 🚀 JOB 5: Deploy to GitHub Pages
+  # 🚀 JOB 6: Deploy to GitHub Pages
   # ═══════════════════════════════════════════════════════════════════════════
   deploy:
     name: 🚀 Deploy to GitHub Pages
