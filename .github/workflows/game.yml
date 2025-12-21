@@ -44,12 +44,7 @@ on:
       - 'game/**'
       - 'config.yml'
   workflow_dispatch:
-    inputs:
-      force_rebuild:
-        description: '🔄 Force rebuild everything (ignores change detection)'
-        required: false
-        default: false
-        type: boolean
+    # Manual trigger - rebuilds everything
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔒 PERMISSIONS - Minimal permissions at workflow level
@@ -123,82 +118,29 @@ jobs:
           echo "═══════════════════════════════════════════"
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # 🔍 JOB 2: Detect Changes
+  # 🔍 JOB 2: Find Game Archive
   # ═══════════════════════════════════════════════════════════════════════════
-  detect-changes:
-    name: 🔍 Detect Changes
+  find-game:
+    name: 🎯 Find Game Archive
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: read-config
     permissions:
       contents: read
     outputs:
-      docs_changed: ${{ steps.changes.outputs.docs }}
-      game_changed: ${{ steps.changes.outputs.game }}
       latest_game_zip: ${{ steps.find-game.outputs.zip_file }}
       has_game_zip: ${{ steps.find-game.outputs.has_zip }}
-      should_build_all: ${{ steps.force-check.outputs.force_rebuild }}
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0  # Full history needed for git log queries
 
-      - name: 🔄 Check Force Rebuild Flag
-        id: force-check
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.force_rebuild }}" == "true" ]]; then
-            echo "force_rebuild=true" >> $GITHUB_OUTPUT
-            echo "🔄 Force rebuild requested - all components will be rebuilt"
-          else
-            echo "force_rebuild=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: 🕵️ Detect What Changed
-        id: changes
-        run: |
-          echo "🔎 Investigating recent changes..."
-          
-          # Handle first commit or shallow clone gracefully
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-          else
-            echo "ℹ️ First commit or shallow clone - checking all files in HEAD"
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
-          fi
-          
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-          echo ""
-          
-          # Check for force rebuild
-          if [[ "${{ steps.force-check.outputs.force_rebuild }}" == "true" ]]; then
-            echo "docs=true" >> $GITHUB_OUTPUT
-            echo "game=true" >> $GITHUB_OUTPUT
-            echo "🔄 Force rebuild: marking all as changed"
-          else
-            # Check if docs changed
-            if echo "$CHANGED_FILES" | grep -qE "^${{ env.DOCS_PATH }}/.*\.md$"; then
-              echo "docs=true" >> $GITHUB_OUTPUT
-              echo "📚 Documentation changes detected!"
-            else
-              echo "docs=false" >> $GITHUB_OUTPUT
-              echo "📚 No documentation changes"
-            fi
-            
-            # Check if game zip changed
-            if echo "$CHANGED_FILES" | grep -qE "^${{ env.GAME_ZIP_PATH }}/.*\.zip$"; then
-              echo "game=true" >> $GITHUB_OUTPUT
-              echo "🎮 Game archive changes detected!"
-            else
-              echo "game=false" >> $GITHUB_OUTPUT
-              echo "🎮 No game archive changes"
-            fi
-          fi
-
       - name: 🎯 Find Latest Game Archive
         id: find-game
         run: |
+          # Always find and build the most recent game zip in the repo,
+          # regardless of what triggered this workflow run
           echo "🎯 Searching for game archives in ${{ env.GAME_ZIP_PATH }}/..."
           
           if [[ ! -d "${{ env.GAME_ZIP_PATH }}" ]]; then
@@ -218,8 +160,6 @@ jobs:
             echo "zip_file=$LATEST_ZIP" >> $GITHUB_OUTPUT
             echo "has_zip=true" >> $GITHUB_OUTPUT
             echo "✅ Found game archive: $LATEST_ZIP"
-            
-            # Display ZIP info for debugging
             echo ""
             echo "📦 Archive details:"
             ls -lh "$LATEST_ZIP"
@@ -230,19 +170,19 @@ jobs:
             echo "⚠️ No game archives found in ${{ env.GAME_ZIP_PATH }}/"
           fi
 
-      - name: 📊 Detection Summary
+      - name: 📊 Summary
         run: |
           echo ""
           echo "═══════════════════════════════════════════"
-          echo "           🔍 DETECTION SUMMARY            "
+          echo "            🎯 GAME ARCHIVE                "
           echo "═══════════════════════════════════════════"
-          echo "📚 Docs changed:    ${{ steps.changes.outputs.docs }}"
-          echo "🎮 Game changed:    ${{ steps.changes.outputs.game }}"
           echo "📦 Game ZIP found:  ${{ steps.find-game.outputs.has_zip }}"
           echo "📁 ZIP file:        ${{ steps.find-game.outputs.zip_file }}"
-          echo "🔄 Force rebuild:   ${{ steps.force-check.outputs.force_rebuild }}"
           echo "🎮 Godot version:   ${{ needs.read-config.outputs.godot_version }}"
           echo "═══════════════════════════════════════════"
+          echo ""
+          echo "ℹ️  Game will be built on every workflow run"
+          echo "    (not just when game/ changes)"
 
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -252,8 +192,8 @@ jobs:
     name: 🎮 Build Godot Game
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [read-config, detect-changes]
-    if: needs.detect-changes.outputs.has_game_zip == 'true'
+    needs: [read-config, find-game]
+    if: needs.find-game.outputs.has_game_zip == 'true'
     permissions:
       contents: read
     container:
@@ -275,7 +215,7 @@ jobs:
       - name: 🔐 Validate ZIP Archive
         id: validate-zip
         run: |
-          ZIP_FILE="${{ needs.detect-changes.outputs.latest_game_zip }}"
+          ZIP_FILE="${{ needs.find-game.outputs.latest_game_zip }}"
           echo "🔐 Validating archive: $ZIP_FILE"
           
           # Check file exists
@@ -311,7 +251,7 @@ jobs:
         run: |
           echo "📦 Extracting game project..."
           mkdir -p "${{ env.BUILD_DIR }}"
-          unzip -o "${{ needs.detect-changes.outputs.latest_game_zip }}" -d "${{ env.BUILD_DIR }}"
+          unzip -o "${{ needs.find-game.outputs.latest_game_zip }}" -d "${{ env.BUILD_DIR }}"
           echo "✅ Game project extracted!"
           echo ""
           echo "📂 Project structure:"
@@ -524,7 +464,7 @@ jobs:
     name: 📚 Build Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [read-config, detect-changes]
+    needs: [read-config, find-game]
     permissions:
       contents: read
     steps:
@@ -651,7 +591,7 @@ jobs:
     name: 🔨 Combine Game & Docs
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [read-config, detect-changes, build-game, build-docs]
+    needs: [read-config, find-game, build-game, build-docs]
     # Run if docs built successfully; game is optional
     # Note: This means the site deploys even if game build fails
     if: always() && needs.build-docs.result == 'success'
