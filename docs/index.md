@@ -1,4 +1,3 @@
 # My Game
 
-Play my game!
-
+[Play the Game →](play.html)
