@@ -556,6 +556,7 @@ jobs:
 
           title: ${{ env.GAME_TITLE }} - Documentation
           description: Game documentation and playable demo
+          baseurl: /${{ github.event.repository.name }}
 
           # Exclude workflow files from processing
           exclude:
