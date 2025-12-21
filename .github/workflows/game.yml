@@ -652,7 +652,7 @@ jobs:
           
           # Download coi-serviceworker.js
           curl -fsSL -o "$GAME_DIR/coi-serviceworker.js" \
-            "https://raw.githubusercontent.com/nickelcash/coi-serviceworker/main/coi-serviceworker.min.js"
+            "https://unpkg.com/coi-serviceworker@0.1.7/coi-serviceworker.min.js"
           
           if [[ ! -f "$GAME_DIR/coi-serviceworker.js" ]]; then
             echo "❌ Failed to download coi-serviceworker.js"
