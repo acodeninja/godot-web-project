@@ -8,7 +8,7 @@ A GitHub template for creating Godot games that deploy to the web.
 2. Edit the `README.md` file to describe your game.
 3. Export a ZIP file from the Godot online engine.
 4. Upload the ZIP file to the `game/` directory.
-5. Wait for your website to publish.
+5. Go to [Actions](actions/workflows/game.yml) > Click "Run Workflow" > Set the correct Godot Version > Click "Run Workflow"
 
 ## Project Structure
 
