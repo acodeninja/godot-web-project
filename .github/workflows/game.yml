@@ -218,7 +218,7 @@ jobs:
       # Note: For maximum security, pin to a specific image digest:
       # image: barichello/godot-ci@sha256:<digest>
       # Find digests at: https://hub.docker.com/r/barichello/godot-ci/tags
-      image: barichello/godot-ci:${{ env.GODOT_VERSION || "4.5.1" }}
+      image: barichello/godot-ci:${{ env.GODOT_VERSION }}
     outputs:
       build_success: ${{ steps.verify-build.outputs.success }}
     steps:
