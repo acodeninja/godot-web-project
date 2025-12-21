@@ -639,6 +639,39 @@ jobs:
           path: ${{ env.SITE_OUTPUT_DIR }}/game/
         continue-on-error: true  # Game build is optional
 
+      - name: 🔒 Add Cross-Origin Isolation Service Worker
+        run: |
+          GAME_DIR="${{ env.SITE_OUTPUT_DIR }}/game"
+          
+          if [[ ! -d "$GAME_DIR" ]]; then
+            echo "⚠️ No game directory found, skipping COI service worker"
+            exit 0
+          fi
+          
+          echo "🔒 Adding coi-serviceworker for SharedArrayBuffer support..."
+          
+          # Download coi-serviceworker.js
+          curl -fsSL -o "$GAME_DIR/coi-serviceworker.js" \
+            "https://raw.githubusercontent.com/nickelcash/coi-serviceworker/main/coi-serviceworker.min.js"
+          
+          if [[ ! -f "$GAME_DIR/coi-serviceworker.js" ]]; then
+            echo "❌ Failed to download coi-serviceworker.js"
+            exit 1
+          fi
+          
+          echo "✅ Downloaded coi-serviceworker.js"
+          
+          # Inject the script tag into index.html (must be before other scripts)
+          if [[ -f "$GAME_DIR/index.html" ]]; then
+            # Insert the service worker script right after <head>
+            if grep -q "<head>" "$GAME_DIR/index.html"; then
+              sed -i 's|<head>|<head>\n\t<script src="coi-serviceworker.js"></script>|' "$GAME_DIR/index.html"
+              echo "✅ Injected coi-serviceworker into game index.html"
+            else
+              echo "⚠️ Could not find <head> tag, manual injection may be needed"
+            fi
+          fi
+
       - name: 🎮 Create Game Embed Page
         env:
           PAGE_TITLE: ${{ env.GAME_TITLE }}
@@ -849,11 +882,11 @@ jobs:
               
               footer a { color: #888; }
               
-              /* Warning banner for SharedArrayBuffer */
-              .threading-warning {
-                background: #2a2a1e;
-                border: 1px solid #ffaa00;
-                color: #ffcc00;
+              /* Info banner for first-load reload */
+              .coi-info {
+                background: #1e2a1e;
+                border: 1px solid #00aa00;
+                color: #88cc88;
                 padding: 0.75rem 1rem;
                 margin: 0 2rem 1rem;
                 border-radius: 8px;
@@ -876,8 +909,8 @@ jobs:
               <a href="index.html">📚 Documentation</a>
             </header>
             
-            <div class="threading-warning" id="threading-warning">
-              ⚠️ Note: Multi-threading is disabled on GitHub Pages. Some features may run slower than expected.
+            <div class="coi-info" id="coi-info">
+              ℹ️ First visit? The page may reload once to enable full game performance.
             </div>
             
             <main>
@@ -912,11 +945,12 @@ jobs:
                 const gameFrame = document.getElementById('game-frame');
                 const fullscreenBtn = document.getElementById('fullscreen-btn');
                 const gameContainer = document.getElementById('game-container');
-                const threadingWarning = document.getElementById('threading-warning');
+                const coiInfo = document.getElementById('coi-info');
                 
-                // Show threading warning (GitHub Pages doesn't support required headers)
-                if (!crossOriginIsolated) {
-                  threadingWarning.style.display = 'block';
+                // Show first-visit info if service worker hasn't activated yet
+                if (!crossOriginIsolated && !sessionStorage.getItem('coi-visited')) {
+                  coiInfo.style.display = 'block';
+                  sessionStorage.setItem('coi-visited', '1');
                 }
                 
                 // Check if game exists
@@ -1005,6 +1039,11 @@ jobs:
             
             if [[ -f "${{ env.SITE_OUTPUT_DIR }}/game/index.html" ]]; then
               echo "| Game Build | ✅ Success |"
+              if [[ -f "${{ env.SITE_OUTPUT_DIR }}/game/coi-serviceworker.js" ]]; then
+                echo "| COI Service Worker | ✅ Installed |"
+              else
+                echo "| COI Service Worker | ⚠️ Missing |"
+              fi
             else
               echo "| Game Build | ⚠️ Skipped/Failed |"
             fi
