@@ -101,11 +101,18 @@ jobs:
       latest_game_zip: ${{ steps.find-game.outputs.zip_file }}
       has_game_zip: ${{ steps.find-game.outputs.has_zip }}
       should_build_all: ${{ steps.force-check.outputs.force_rebuild }}
+      godot_version: ${{ steps.godot-version.outputs.version }}
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2  # Need at least 2 commits for diff, or 0 for full history
+
+      - name: 🎮 Resolve Godot Version
+        id: godot-version
+        run: |
+          echo "version=${{ env.GODOT_VERSION }}" >> $GITHUB_OUTPUT
+          echo "🎮 Godot version: ${{ env.GODOT_VERSION }}"
 
       - name: 🔄 Check Force Rebuild Flag
         id: force-check
@@ -201,6 +208,7 @@ jobs:
           echo "📦 Game ZIP found:  ${{ steps.find-game.outputs.has_zip }}"
           echo "📁 ZIP file:        ${{ steps.find-game.outputs.zip_file }}"
           echo "🔄 Force rebuild:   ${{ steps.force-check.outputs.force_rebuild }}"
+          echo "🎮 Godot version:   ${{ steps.godot-version.outputs.version }}"
           echo "═══════════════════════════════════════════"
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -218,7 +226,7 @@ jobs:
       # Note: For maximum security, pin to a specific image digest:
       # image: barichello/godot-ci@sha256:<digest>
       # Find digests at: https://hub.docker.com/r/barichello/godot-ci/tags
-      image: barichello/godot-ci:${{ env.GODOT_VERSION }}
+      image: barichello/godot-ci:${{ needs.detect-changes.outputs.godot_version }}
     outputs:
       build_success: ${{ steps.verify-build.outputs.success }}
     steps:
@@ -291,15 +299,16 @@ jobs:
 
       - name: 🔧 Setup Export Templates
         run: |
-          echo "🔧 Setting up Godot export templates for version ${{ env.GODOT_VERSION }}..."
+          GODOT_VER="${{ needs.detect-changes.outputs.godot_version }}"
+          echo "🔧 Setting up Godot export templates for version ${GODOT_VER}..."
           
-          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable"
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VER}.stable"
           mkdir -p "$TEMPLATE_DIR"
           mkdir -p "$HOME/.config/godot"
           
           # Move templates from container's root location
-          if [[ -d "/root/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable" ]]; then
-            cp -r "/root/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/"* "$TEMPLATE_DIR/" 2>/dev/null || true
+          if [[ -d "/root/.local/share/godot/export_templates/${GODOT_VER}.stable" ]]; then
+            cp -r "/root/.local/share/godot/export_templates/${GODOT_VER}.stable/"* "$TEMPLATE_DIR/" 2>/dev/null || true
           fi
           
           # Copy editor settings if they exist
@@ -375,7 +384,8 @@ jobs:
           # Create output directory
           mkdir -p build/web
           
-          echo "🏗️ Building game for web with Godot ${{ env.GODOT_VERSION }}..."
+          GODOT_VER="${{ needs.detect-changes.outputs.godot_version }}"
+          echo "🏗️ Building game for web with Godot ${GODOT_VER}..."
           echo "═══════════════════════════════════════════"
           
           # First, import the project to generate .godot/imported files
