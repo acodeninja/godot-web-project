@@ -19,7 +19,7 @@ env:
   # ── Fallback Defaults (used if config.yml missing) ──────────────────────────
   DEFAULT_THEME: 'primer'
   DEFAULT_GAME_NAME: 'Play Game'
-  DEFAULT_GODOT_VERSION: '4.3'
+  DEFAULT_GODOT_VERSION: '4.5.2'
   
   # ── Directory Paths ─────────────────────────────────────────────────────────
   GAME_ZIP_PATH: 'game'
