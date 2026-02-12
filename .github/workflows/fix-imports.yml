@@ -18,9 +18,6 @@ on:
   push:
     paths:
       - 'work_in_progress/**.zip'
-    # Exclude _fixed.zip files as an extra safety net
-    paths-ignore:
-      - 'work_in_progress/**_fixed.zip'
 
 permissions:
   contents: write
