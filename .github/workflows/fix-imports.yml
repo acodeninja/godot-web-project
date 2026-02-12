@@ -18,6 +18,7 @@ on:
   push:
     paths:
       - 'work_in_progress/**.zip'
+  workflow_dispatch:
 
 permissions:
   contents: write
