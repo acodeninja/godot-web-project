@@ -22,7 +22,7 @@ env:
   DEFAULT_GODOT_VERSION: '4.5.2'
   
   # ── Directory Paths ─────────────────────────────────────────────────────────
-  GAME_ZIP_PATH: 'game'
+  GAME_ZIP_PATH: 'publish'
   DOCS_PATH: 'docs'
   BUILD_DIR: '/tmp/game-project'
   SITE_OUTPUT_DIR: '_combined_site'
@@ -41,7 +41,7 @@ on:
   push:
     paths:
       - 'docs/**'
-      - 'game/**'
+      - 'publish/**'
       - 'config.yml'
   workflow_dispatch:
     # Manual trigger - rebuilds everything
@@ -146,7 +146,7 @@ jobs:
           if [[ ! -d "${{ env.GAME_ZIP_PATH }}" ]]; then
             echo "zip_file=" >> $GITHUB_OUTPUT
             echo "has_zip=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Game directory ${{ env.GAME_ZIP_PATH }}/ does not exist"
+            echo "⚠️ Publish directory ${{ env.GAME_ZIP_PATH }}/ does not exist"
             exit 0
           fi
           
@@ -186,7 +186,7 @@ jobs:
           echo "═══════════════════════════════════════════"
           echo ""
           echo "ℹ️  Game will be built on every workflow run"
-          echo "    (not just when game/ changes)"
+          echo "    (not just when publish/ changes)"
 
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -967,7 +967,7 @@ jobs:
                       '<div class="game-icon">🚧</div>' +
                       '<h2>Game Not Available</h2>' +
                       '<p>The game build is not available yet.</p>' +
-                      '<p style="margin-top: 1rem; color: #888;">Upload a Godot project zip to the game/ directory to enable this feature.</p>' +
+                      '<p style="margin-top: 1rem; color: #888;">Upload a Godot project zip to the publish/ directory to enable this feature.</p>' +
                     '</div>';
                 }
                 
