@@ -16,7 +16,9 @@ To fix this:
 
 1. Export a ZIP file from the Godot online engine.
 2. Upload the ZIP file to the `work_in_progress/` directory.
-3. Wait for your game to build and publish.
+3. Wait for your game to be fixed.
+
+Once the game is fixed, you will find a file with the same name but suffixed with `_fixed.zip` that has the required changes needed to allow openning without errors in the godot online editor.
 
 ## Publishing your Game
 
