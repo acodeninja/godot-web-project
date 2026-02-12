@@ -7,15 +7,34 @@ A GitHub template for creating Godot games that deploy to the web.
 1. Click **<a href="https://github.com/acodeninja/godot-web-project/generate" target="_blank">Use this template</a>** to create a new repository from this template.
 2. Go to "Settings" > "Pages" - Set "Source" to "GitHub Actions"
 3. Edit the `config.yml` file to set your game's name, Godot version, and website template.
-4. Export a ZIP file from the Godot online engine.
-5. Upload the ZIP file to the `game/` directory.
-6. Wait for your game to build and publish.
+
+## Fix your exported Godot Game
+
+One issue with the [godot online editor](https://editor.godotengine.org/releases/latest/) is that any games exported from the editor can fail to import.
+
+To fix this:
+
+1. Export a ZIP file from the Godot online engine.
+2. Upload the ZIP file to the `work_in_progress/` directory.
+3. Wait for your game to build and publish.
+
+## Publishing your Game
+
+1. Export a ZIP file from the Godot online engine.
+2. Upload the ZIP file to the `publish/` directory.
+3. Wait for your game to build and publish.
 
 ## Project Structure
 
-### `game/`
+### `publish/`
 
 Upload the zip file produced by the Godot web export here. This is where your playable game lives.
+
+### `work_in_progress/`
+
+This is where your work in progress game lives.
+
+Upload the zip file produced by the Godot web export here, the repo will then fix it so it can be imported into the [godot online editor](https://editor.godotengine.org/releases/latest/) without stalling.
 
 ### `docs/`
 
