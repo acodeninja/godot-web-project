@@ -195,6 +195,10 @@ jobs:
       - name: 📤 Commit and push fixed zips
         if: steps.find-zips.outputs.has_zips == 'true'
         run: |
+          cd "$GITHUB_WORKSPACE"
+
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
           # Check if there are any _fixed.zip files to commit
           if ! ls work_in_progress/*_fixed.zip 1>/dev/null 2>&1; then
             echo "⚠️  No fixed zips were produced — nothing to commit."
